@@ -13,11 +13,53 @@ impl Ray {
     }
 }
 
+#[derive(Debug)]
 pub struct Tri {
     pub v0: Vector3<f64>,
     pub v1: Vector3<f64>,
     pub v2: Vector3<f64>,
     pub color: Vector3<f64>,
+}
+
+pub trait Rotation {
+    fn rotation_x(&self, a: f64) -> Self;
+    fn rotation_y(&self, a: f64) -> Self;
+    fn rotation_z(&self, a: f64) -> Self;
+    fn rotate(&self, a: Vector3<f64>) -> Self
+    where
+        Self: Sized,
+    {
+        self.rotation_x(a.get_x())
+            .rotation_y(a.get_y())
+            .rotation_z(a.get_z())
+    }
+}
+
+impl Rotation for Vector3<f64> {
+    fn rotation_z(&self, a: f64) -> Self {
+        let x = self.get_x();
+        let y = self.get_y();
+        let z = self.get_z();
+        let nx = a.cos() * x - a.sin() * y;
+        let ny = a.sin() * x + a.cos() * y;
+        Vector3::new(nx, ny, z)
+    }
+    fn rotation_y(&self, a: f64) -> Self {
+        let x = self.get_x();
+        let y = self.get_y();
+        let z = self.get_z();
+        let nx = a.cos() * x + a.sin() * z;
+        let nz = -a.sin() * x + a.cos() * z;
+        Vector3::new(nx, y, nz)
+    }
+    fn rotation_x(&self, a: f64) -> Self {
+        let x = self.get_x();
+        let y = self.get_y();
+        let z = self.get_z();
+        let ny = a.cos() * y - a.sin() * z;
+        let nz = a.sin() * y + a.cos() * z;
+        Vector3::new(x, ny, nz)
+    }
 }
 
 impl Tri {

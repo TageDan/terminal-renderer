@@ -1,16 +1,18 @@
 use std::f64::consts::PI;
 
 use crate::math;
+use math::Rotation;
 use term_size;
 use vec3_rs::Vector3;
 
 pub struct Camera {
     pub pos: Vector3<f64>,
+    pub rotation: Vector3<f64>,
 }
 
 impl Camera {
-    pub fn new(pos: Vector3<f64>) -> Self {
-        Self { pos }
+    pub fn new(pos: Vector3<f64>, rotation: Vector3<f64>) -> Self {
+        Self { pos, rotation }
     }
 }
 
@@ -50,9 +52,11 @@ impl Screen {
                 let ray_o = camera.pos; // Ray Origin
                 let row = (row as f64 / self.h as f64) * 2. - 1.; // Scale from -1 to +1
                 let col = (col as f64 / self.w as f64) * 2. - 1.; // --||--
+                let ray_dir = Vector3::new(col, row, self.focus_dist);
+                let ray_dir = ray_dir.rotate(camera.rotation);
 
                 // Ray
-                let ray = math::Ray::new(ray_o, Vector3::new(col, row, self.focus_dist));
+                let ray = math::Ray::new(ray_o, ray_dir);
 
                 // Get hit triangle and distance to hit
                 let (hit_tri, distance) = {
@@ -74,7 +78,7 @@ impl Screen {
                     let inv_dir = ray.dir * -1.;
                     let a = normal.angle(&ray.dir).min(normal.angle(&inv_dir));
                     let f = 1.0 - a.abs() / PI;
-                    const RENDER_DIST: f64 = 75.;
+                    const RENDER_DIST: f64 = 50.;
                     let color = t.color * f * ((RENDER_DIST - distance) / RENDER_DIST).max(0.);
                     buffer.push(color);
                 } else {

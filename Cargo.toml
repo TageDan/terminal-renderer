@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+device_query = "2.1.0"
 term_size = "0.3.2"
 vec3-rs = "0.1.6" #Vector operations
