@@ -58,7 +58,7 @@ fn add_vertex(vertices: &mut Vec<Vector3<f64>>, line: Chars) -> Result<(), MeshE
     let c1 = &coords[0].as_ref().map_err(|err| *err)?;
     let c2 = &coords[1].as_ref().map_err(|err| *err)?;
     let c3 = &coords[2].as_ref().map_err(|err| *err)?;
-    vertices.push(Vector3::new(**c1, **c2, **c3));
+    vertices.push(Vector3::new(**c1 * (-1.), **c2 * (-1.), **c3 * (-1.)));
     Ok(())
 }
 
@@ -78,7 +78,7 @@ pub fn load_obj_to_mesh<P: AsRef<Path>>(path: P) -> Result<Mesh, MeshError> {
                 'v' => {
                     if state == LoadingState::TriCollection {
                         state = LoadingState::VertexCollection;
-                        verts = Vec::new();
+                        // verts = Vec::new();
                     }
                     add_vertex(&mut verts, chars)?;
                 }

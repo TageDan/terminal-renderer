@@ -1,8 +1,12 @@
 use std::f64::consts::PI;
 
 use crate::math;
+use crossterm;
 use math::Rotation;
-use term_size;
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
+    IntoParallelRefMutIterator, ParallelIterator,
+};
 use vec3_rs::Vector3;
 
 pub struct Camera {
@@ -30,6 +34,8 @@ impl Screen {
             focus_dist,
         };
 
+        crossterm::terminal::enable_raw_mode();
+
         screen.update_size();
 
         println!("\x1b[?25l");
@@ -39,16 +45,20 @@ impl Screen {
     }
 
     pub fn update_size(&mut self) {
-        if let Some(s) = term_size::dimensions() {
-            self.w = s.0;
-            self.h = s.1;
+        if let Ok(s) = crossterm::terminal::size() {
+            self.w = s.0 as usize;
+            self.h = s.1 as usize;
         }
     }
 
     pub fn render(&self, camera: &Camera, mesh: &math::Mesh) {
-        let mut buffer = Vec::with_capacity(self.w * self.h + 10);
-        for row in 0..self.h {
-            for col in 0..self.w {
+        let buffer = vec![Vector3::new(0., 0., 0.); self.w * self.h + 10];
+        let buffer: Vec<_> = buffer
+            .into_par_iter()
+            .enumerate()
+            .map(|(idx, color)| {
+                let row = (idx as usize) / self.w;
+                let col = (idx as usize) % self.w;
                 let ray_o = camera.pos; // Ray Origin
                 let row = (row as f64 / self.h as f64) * 2. - 1.; // Scale from -1 to +1
                 let col = (col as f64 / self.w as f64) * 2. - 1.; // --||--
@@ -60,15 +70,26 @@ impl Screen {
 
                 // Get hit triangle and distance to hit
                 let (hit_tri, distance) = {
-                    let mut hit_tri = None;
-                    let mut dist = f64::MAX;
-                    for tri in mesh.tris.iter() {
-                        if let Some(d) = tri.hit(&ray) {
-                            if d < dist {
-                                dist = d;
-                                hit_tri = Some(tri);
+                    let hit: Vec<(f64, &math::Tri)> = mesh
+                        .tris
+                        .iter()
+                        .filter_map(|tri| {
+                            if let Some(d) = tri.hit(&ray) {
+                                return Some((d, tri));
+                            } else {
+                                return None;
                             };
-                        };
+                        })
+                        .collect();
+
+                    let mut dist = f64::MAX;
+                    let mut hit_tri = None;
+
+                    for (d, tri) in hit {
+                        if d > 0. && d < dist {
+                            dist = d;
+                            hit_tri = Some(tri)
+                        }
                     }
                     (hit_tri, dist)
                 };
@@ -78,19 +99,19 @@ impl Screen {
                     let inv_dir = ray.dir * -1.;
                     let a = normal.angle(&ray.dir).min(normal.angle(&inv_dir));
                     let f = 1.0 - a.abs() / PI;
-                    const RENDER_DIST: f64 = 50.;
+                    const RENDER_DIST: f64 = 7.;
                     let color = t.color * f * ((RENDER_DIST - distance) / RENDER_DIST).max(0.);
-                    buffer.push(color);
+                    return color;
                 } else {
-                    buffer.push(Vector3::new(0., 0., 0.));
+                    return Vector3::new(0., 0., 0.);
                 }
-            }
-        }
+            })
+            .collect();
         self.flush(&buffer);
     }
 
     pub fn flush(&self, buffer: &[Vector3<f64>]) {
-        println!("\x1b[H"); // Move curor Home
+        print!("\x1b[H"); // Move curor Home
         for row in 0..self.h {
             for col in 0..self.w {
                 let color = buffer[row * self.w + col];

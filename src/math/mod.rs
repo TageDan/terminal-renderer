@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use vec3_rs::Vector3;
 
@@ -100,12 +100,15 @@ impl Tri {
             return None;
         }
         let t = e2.dot(&q) * inv_det;
+        if t < 0. {
+            return None;
+        }
         Some(t)
     }
 }
 
 pub struct Mesh {
-    pub tris: Rc<[Tri]>,
+    pub tris: Arc<[Tri]>,
 }
 
 impl Mesh {
