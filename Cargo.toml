@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 crossterm = "0.28.1"
 rayon = "1.10.0"
-vec3-rs = "0.1.6" #Vector operations
+glam = "0.29.2"
+clap = { version = "4.5.21", features = ["derive"] }
