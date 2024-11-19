@@ -13,8 +13,6 @@ impl Ray {
     }
 }
 
-const OCTREE_MAX_NODES_IN_LEAF: usize = 10;
-
 #[derive(Debug, Clone)]
 pub struct Tri {
     pub v0: Vec3,
@@ -141,6 +139,7 @@ pub struct Octree {
     top_left_front: Vec3,
     bottom_right_back: Vec3,
     middle: Vec3,
+    max_nodes: usize,
     node: OctreeNode,
 }
 
@@ -162,7 +161,18 @@ impl Octree {
             top_left_front,
             bottom_right_back,
             middle: (top_left_front + bottom_right_back) / 2.,
+            max_nodes: 1,
             node: OctreeNode::None,
+        }
+    }
+
+    pub fn with_max_nodes(self, max_nodes: usize) -> Self {
+        Self {
+            top_left_front: self.top_left_front,
+            bottom_right_back: self.bottom_right_back,
+            middle: (self.top_left_front + self.bottom_right_back) / 2.,
+            max_nodes,
+            node: self.node,
         }
     }
 
@@ -187,57 +197,81 @@ impl Octree {
             OctreeNode::Leaf {
                 tri: ref mut innertri,
             } => {
-                if innertri.len() < OCTREE_MAX_NODES_IN_LEAF {
+                if innertri.len() < self.max_nodes {
                     innertri.push(tri.clone());
                     return;
                 }
                 let children = [
                     // bottom_right back
-                    Box::new(Octree::new(self.middle, self.bottom_right_back)),
+                    Box::new(
+                        Octree::new(self.middle, self.bottom_right_back)
+                            .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // bottom_right_front
-                    Box::new(Octree::new(
-                        Vec3::new(self.middle.x, self.middle.y, self.top_left_front.z),
-                        Vec3::new(
-                            self.bottom_right_back.x,
-                            self.bottom_right_back.y,
-                            self.middle.z,
-                        ),
-                    )),
+                    Box::new(
+                        Octree::new(
+                            Vec3::new(self.middle.x, self.middle.y, self.top_left_front.z),
+                            Vec3::new(
+                                self.bottom_right_back.x,
+                                self.bottom_right_back.y,
+                                self.middle.z,
+                            ),
+                        )
+                        .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // top_right_back
-                    Box::new(Octree::new(
-                        Vec3::new(self.middle.x, self.top_left_front.y, self.middle.z),
-                        Vec3::new(
-                            self.bottom_right_back.x,
-                            self.middle.y,
-                            self.bottom_right_back.z,
-                        ),
-                    )),
+                    Box::new(
+                        Octree::new(
+                            Vec3::new(self.middle.x, self.top_left_front.y, self.middle.z),
+                            Vec3::new(
+                                self.bottom_right_back.x,
+                                self.middle.y,
+                                self.bottom_right_back.z,
+                            ),
+                        )
+                        .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // top_right_front
-                    Box::new(Octree::new(
-                        Vec3::new(self.middle.x, self.top_left_front.y, self.top_left_front.z),
-                        Vec3::new(self.bottom_right_back.x, self.middle.y, self.middle.z),
-                    )),
+                    Box::new(
+                        Octree::new(
+                            Vec3::new(self.middle.x, self.top_left_front.y, self.top_left_front.z),
+                            Vec3::new(self.bottom_right_back.x, self.middle.y, self.middle.z),
+                        )
+                        .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // bottom_left back
-                    Box::new(Octree::new(
-                        Vec3::new(self.top_left_front.x, self.middle.y, self.middle.z),
-                        Vec3::new(
-                            self.middle.x,
-                            self.bottom_right_back.y,
-                            self.bottom_right_back.z,
-                        ),
-                    )),
+                    Box::new(
+                        Octree::new(
+                            Vec3::new(self.top_left_front.x, self.middle.y, self.middle.z),
+                            Vec3::new(
+                                self.middle.x,
+                                self.bottom_right_back.y,
+                                self.bottom_right_back.z,
+                            ),
+                        )
+                        .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // bottom_left_front
-                    Box::new(Octree::new(
-                        Vec3::new(self.top_left_front.x, self.middle.y, self.top_left_front.z),
-                        Vec3::new(self.middle.x, self.bottom_right_back.y, self.middle.z),
-                    )),
+                    Box::new(
+                        Octree::new(
+                            Vec3::new(self.top_left_front.x, self.middle.y, self.top_left_front.z),
+                            Vec3::new(self.middle.x, self.bottom_right_back.y, self.middle.z),
+                        )
+                        .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // top_left_back
-                    Box::new(Octree::new(
-                        Vec3::new(self.top_left_front.x, self.top_left_front.y, self.middle.z),
-                        Vec3::new(self.middle.x, self.middle.y, self.bottom_right_back.z),
-                    )),
+                    Box::new(
+                        Octree::new(
+                            Vec3::new(self.top_left_front.x, self.top_left_front.y, self.middle.z),
+                            Vec3::new(self.middle.x, self.middle.y, self.bottom_right_back.z),
+                        )
+                        .with_max_nodes(self.max_nodes * 3),
+                    ),
                     // top_left_front
-                    Box::new(Octree::new(self.top_left_front, self.middle)),
+                    Box::new(
+                        Octree::new(self.top_left_front, self.middle)
+                            .with_max_nodes(self.max_nodes * 3),
+                    ),
                 ];
 
                 self.node = OctreeNode::Node {
