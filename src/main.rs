@@ -27,6 +27,9 @@ struct Args {
     /// Characters to use for different light levels [low..high]
     #[arg(long, num_args=0..)]
     chars: Vec<char>,
+
+    #[arg(short)]
+    octree: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -83,7 +86,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         Vec3::new(0., PI, 0.),
     );
     loop {
-        screen.render(&camera, &mesh, &args.chars);
+        if args.octree {
+            screen.render_octree(&camera, &mesh, &args.chars);
+        } else {
+            screen.render(&camera, &mesh, &args.chars);
+        }
         while let Ok(true) = event::poll(Duration::from_millis(0)) {
             let _ = event::read();
         }
