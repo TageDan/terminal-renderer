@@ -28,6 +28,13 @@ pub struct Screen {
     focus_dist: f32,
 }
 
+impl Drop for Screen {
+    fn drop(&mut self) {
+        crossterm::terminal::disable_raw_mode();
+        println!("\x1b[?25h");
+    }
+}
+
 impl Screen {
     pub fn new(focus_dist: f32) -> Self {
         let mut screen = Self {
