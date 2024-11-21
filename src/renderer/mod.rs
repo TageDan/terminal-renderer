@@ -1,13 +1,10 @@
-use core::panic;
-use std::{f32::consts::PI, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
-use crate::math;
+use crate::math::{self, Octree};
 use crossterm;
 use math::Rotation;
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
-    IntoParallelRefMutIterator, ParallelIterator,
-};
+use rayon::iter::ParallelIterator;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator};
 
 use glam::Vec3;
 
@@ -23,9 +20,9 @@ impl Camera {
 }
 
 pub struct Screen {
-    w: usize,
-    h: usize,
-    focus_dist: f32,
+    pub w: usize,
+    pub h: usize,
+    pub focus_dist: f32,
 }
 
 impl Drop for Screen {
@@ -81,8 +78,8 @@ impl Screen {
                 let row = (idx as usize) / self.w;
                 let col = (idx as usize) % self.w;
                 let ray_o = camera.pos; // Ray Origin
-                let row = (row as f32 * 2 as f32 / scale as f32) * 2. - 1.; // Scale from -1 to +1
-                let col = (col as f32 / scale as f32) * 2. - 1.; // --||--
+                let row = (row as f32 * 2. / scale as f32) * 2. - row as f32 * 2. / scale as f32; // Scale from -1 to +1
+                let col = (col as f32 / scale as f32) * 2. - col as f32 / scale as f32; // --||--
                 let ray_dir = Vec3::new(col, row, self.focus_dist);
                 let ray_dir = ray_dir.rotate(camera.rotation);
 
@@ -227,8 +224,8 @@ impl Screen {
                 let row = (idx as usize) / self.w;
                 let col = (idx as usize) % self.w;
                 let ray_o = camera.pos; // Ray Origin
-                let row = (row as f32 * 2 as f32 / scale as f32) * 2. - 1.; // Scale from -1 to +1
-                let col = (col as f32 / scale as f32) * 2. - 1.; // --||--
+                let row = (row as f32 * 2. / scale as f32) * 2. - self.h as f32 * 2. / scale as f32; // Scale from -1 to +1
+                let col = (col as f32 / scale as f32) * 2. - self.w as f32 / scale as f32; // --||--
                 let ray_dir = Vec3::new(col, row, self.focus_dist);
                 let ray_dir = ray_dir.rotate(camera.rotation);
 

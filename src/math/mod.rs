@@ -31,7 +31,13 @@ pub trait Rotation {
     where
         Self: Sized,
     {
-        self.rotation_x(a.x).rotation_y(a.y).rotation_z(a.z)
+        self.rotation_z(a.z).rotation_x(a.x).rotation_y(a.y)
+    }
+    fn rev_rotate(&self, a: Vec3) -> Self
+    where
+        Self: Sized,
+    {
+        self.rotation_y(-a.y).rotation_x(-a.x).rotation_z(-a.z)
     }
 }
 
@@ -140,6 +146,7 @@ pub struct Octree {
     bottom_right_back: Vec3,
     middle: Vec3,
     max_nodes: usize,
+    inserted: usize,
     node: OctreeNode,
 }
 
@@ -162,6 +169,7 @@ impl Octree {
             bottom_right_back,
             middle: (top_left_front + bottom_right_back) / 2.,
             max_nodes: 1,
+            inserted: 0,
             node: OctreeNode::None,
         }
     }
@@ -171,6 +179,7 @@ impl Octree {
             top_left_front: self.top_left_front,
             bottom_right_back: self.bottom_right_back,
             middle: (self.top_left_front + self.bottom_right_back) / 2.,
+            inserted: self.inserted,
             max_nodes,
             node: self.node,
         }
@@ -178,6 +187,7 @@ impl Octree {
 
     pub fn insert(&mut self, tri: Arc<Tri>) {
         let insert = self.should_insert_tri(tri.clone());
+        self.inserted += 1;
         match self.node {
             OctreeNode::None => {
                 let mut tris = Vec::with_capacity(5);
@@ -299,11 +309,11 @@ impl Octree {
             .max(aabb_check_list[1])
             .min(aabb_check_list[2].max(aabb_check_list[3]))
             .min(aabb_check_list[4].max(aabb_check_list[5]));
-        !(aabb_check_list[7] < 0. || aabb_check_list[6] >= aabb_check_list[7])
+        !(aabb_check_list[7] < 0. || aabb_check_list[6] > aabb_check_list[7])
     }
 
     pub fn ray_search_tree(&self, ro: Vec3, rd: Vec3) -> Vec<Arc<Tri>> {
-        let mut result = Vec::new();
+        let mut result = Vec::with_capacity(self.inserted);
 
         match self.node {
             OctreeNode::None => (),
