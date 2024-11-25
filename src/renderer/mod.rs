@@ -8,6 +8,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRef
 
 use glam::Vec3;
 
+#[derive(Clone)]
 pub struct Camera {
     pub pos: Vec3,
     pub rotation: Vec3,
@@ -19,6 +20,7 @@ impl Camera {
     }
 }
 
+#[derive(Clone)]
 pub struct Screen {
     pub w: usize,
     pub h: usize,

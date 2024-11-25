@@ -130,6 +130,7 @@ impl Tri {
     }
 }
 
+#[derive(Clone)]
 pub struct Mesh {
     pub tris: Arc<[Tri]>,
 }
