@@ -1,6 +1,9 @@
+use core::net;
 use std::{rc::Rc, sync::Arc};
 
-use glam::Vec3;
+use glam::{vec3, vec4, Vec3, Vec4};
+
+const EPSILON: f32 = 0.01;
 
 pub struct Ray {
     pub origin: Vec3,
@@ -103,7 +106,7 @@ impl Tri {
         let e2 = self.v2 - self.v0;
         let p = ray.dir.cross(e2);
         let det = e1.dot(p);
-        const EPSILON: f32 = 0.001;
+        // const EPSILON: f32 = 0.001;
 
         // If determinant is close to zero the ray and triangle are parallel
         if det.abs() < EPSILON {
@@ -310,7 +313,7 @@ impl Octree {
             .max(aabb_check_list[1])
             .min(aabb_check_list[2].max(aabb_check_list[3]))
             .min(aabb_check_list[4].max(aabb_check_list[5]));
-        !(aabb_check_list[7] < 0. || aabb_check_list[6] > aabb_check_list[7])
+        !(aabb_check_list[7] + EPSILON <= 0. || aabb_check_list[6] >= EPSILON + aabb_check_list[7])
     }
 
     pub fn ray_search_tree(&self, ro: Vec3, rd: Vec3) -> Vec<Arc<Tri>> {
@@ -336,37 +339,105 @@ impl Octree {
 
     fn should_insert_tri(&self, tri: Arc<Tri>) -> u8 {
         let mut should_insert = 0u8;
-        for v in [tri.v0, tri.v1, tri.v2] {
-            if v.x > self.middle.x {
-                if v.y > self.middle.y {
-                    if v.z > self.middle.z {
-                        should_insert |= 0b00000001;
-                    } else {
-                        should_insert |= 0b00000010;
-                    }
-                } else {
-                    if v.z > self.middle.z {
-                        should_insert |= 0b00000100;
-                    } else {
-                        should_insert |= 0b00001000;
-                    }
-                }
-            } else {
-                if v.y > self.middle.y {
-                    if v.z > self.middle.z {
-                        should_insert |= 0b00010000;
-                    } else {
-                        should_insert |= 0b00100000;
-                    }
-                } else {
-                    if v.z > self.middle.z {
-                        should_insert |= 0b01000000;
-                    } else {
-                        should_insert |= 0b10000000;
-                    }
-                }
-            }
+        // for v in [tri.v0, tri.v1, tri.v2] {
+        if collides((self.middle, self.bottom_right_back), tri.clone()) {
+            should_insert |= 0b00000001;
         }
+        if collides((vec3(self.middle.x, self.middle.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.bottom_right_back.y, self.middle.z)), tri.clone()) {
+            should_insert |= 0b00000010;
+        }
+        if collides((vec3(self.middle.x, self.top_left_front.y, self.middle.z), vec3(self.bottom_right_back.x, self.middle.y, self.bottom_right_back.z)), tri.clone()) {
+            should_insert |= 0b00000100;
+        }
+        if collides((vec3(self.middle.x, self.top_left_front.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.middle.y, self.middle.z)), tri.clone()) {
+            should_insert |= 0b00001000;
+        }
+        if collides((vec3(self.top_left_front.x, self.middle.y, self.middle.z), vec3(self.middle.x, self.bottom_right_back.y, self.bottom_right_back.z)), tri.clone()) {
+            should_insert |= 0b00010000;
+        }
+        if collides((vec3(self.top_left_front.x, self.middle.y, self.top_left_front.z), vec3(self.middle.x, self.bottom_right_back.y, self.middle.z)), tri.clone()) {
+            should_insert |= 0b00100000;
+        }
+        if collides((vec3(self.top_left_front.x, self.top_left_front.y, self.middle.z), vec3(self.middle.x, self.middle.y, self.bottom_right_back.z)), tri.clone()) {
+            should_insert |= 0b01000000;
+        }
+        if collides((vec3(self.top_left_front.x, self.top_left_front.y, self.top_left_front.z), vec3(self.middle.x, self.middle.y, self.middle.z)), tri.clone()) {
+            should_insert |= 0b10000000;
+        }        
         should_insert
     }
+}
+
+fn collides((min_p, max_p): (Vec3, Vec3), tri: Arc<Tri>) -> bool {
+    let p = min_p;
+    let dp = max_p - min_p;
+    let n = tri.normal();
+    let c = vec3(if n.x > 0. {dp.x} else {0.}, if n.y > 0. {dp.y} else {0.}, if n.z > 0. {dp.z} else {0.});
+    let d1 = n.dot(c-tri.v0);
+    let d2 = n.dot(dp-c-tri.v0);
+    if (n.dot(p) + d1)*(n.dot(p) +d2) > 0. {
+        return false;
+    }
+
+    let xym = if n.z < 0. { -1. } else {1.};
+    let ne0xy = vec4(-(tri.v1-tri.v0).y, (tri.v1-tri.v0).x, 0., 0.) * xym;
+    let ne1xy = vec4(-(tri.v2-tri.v1).y, (tri.v2-tri.v1).x, 0., 0.) * xym;
+    let ne2xy = vec4(-(tri.v0-tri.v2).y, (tri.v0-tri.v2).x, 0., 0.) * xym;
+
+    let v0xy = vec4(tri.v0.x,tri.v0.y,0.,0.);
+    let v1xy = vec4(tri.v1.x,tri.v1.y,0.,0.);
+    let v2xy = vec4(tri.v2.x,tri.v2.y,0.,0.);
+
+    let de0xy = -ne0xy.dot(v0xy) + 0_f32.max(dp.x*ne0xy.x) + 0_f32.max(dp.y * ne0xy.y);
+    let de1xy = -ne1xy.dot(v1xy) + 0_f32.max(dp.x*ne1xy.x) + 0_f32.max(dp.y * ne1xy.y);
+    let de2xy = -ne2xy.dot(v2xy) + 0_f32.max(dp.x*ne2xy.x) + 0_f32.max(dp.y * ne2xy.y);
+
+    let pxy = vec4(p.x, p.y, 0., 0.);
+
+    if ne0xy.dot(pxy) + de0xy < - EPSILON || ne1xy.dot(pxy) + de1xy < - EPSILON || ne2xy.dot(pxy) + de2xy < - EPSILON {
+        return false
+    }
+
+    
+    let yzm = if n.x < 0. { -1. } else {1.};
+    let ne0yz = vec4(-(tri.v1-tri.v0).z, (tri.v1-tri.v0).y, 0., 0.) * yzm;
+    let ne1yz = vec4(-(tri.v2-tri.v1).z, (tri.v2-tri.v1).y, 0., 0.) * yzm;
+    let ne2yz = vec4(-(tri.v0-tri.v2).z, (tri.v0-tri.v2).y, 0., 0.) * yzm;
+
+    let v0yz = vec4(tri.v0.y,tri.v0.z,0.,0.);
+    let v1yz = vec4(tri.v1.y,tri.v1.z,0.,0.);
+    let v2yz = vec4(tri.v2.y,tri.v2.z,0.,0.);
+
+    let de0yz = -ne0yz.dot(v0yz) + 0_f32.max(dp.y*ne0yz.x) + 0_f32.max(dp.z * ne0yz.y);
+    let de1yz = -ne1yz.dot(v1yz) + 0_f32.max(dp.y*ne1yz.x) + 0_f32.max(dp.z * ne1yz.y);
+    let de2yz = -ne2yz.dot(v2yz) + 0_f32.max(dp.y*ne2yz.x) + 0_f32.max(dp.z * ne2yz.y);
+
+    let pyz = vec4(p.y, p.z ,0.,0.);
+
+    if ne0yz.dot(pyz) + de0yz < -EPSILON || ne1yz.dot(pyz) + de1yz < -EPSILON || ne2yz.dot(pyz) + de2yz < -EPSILON {
+        return false
+    }
+    
+    let zxm = if n.y < 0. { -1. } else {1.};
+    let ne0zx = vec4(-(tri.v1-tri.v0).x, (tri.v1-tri.v0).z, 0., 0.) * zxm;
+    let ne1zx = vec4(-(tri.v2-tri.v1).x, (tri.v2-tri.v1).z, 0., 0.) * zxm;
+    let ne2zx = vec4(-(tri.v0-tri.v2).x, (tri.v0-tri.v2).z, 0., 0.) * zxm;
+
+    let v0zx = vec4(tri.v0.z,tri.v0.x,0.,0.);
+    let v1zx = vec4(tri.v1.z,tri.v1.x,0.,0.);
+    let v2zx = vec4(tri.v2.z,tri.v2.x,0.,0.);
+
+    //                                          z                         x
+    let de0zx = -ne0zx.dot(v0zx) + 0_f32.max(dp.y*ne0zx.x) + 0_f32.max(dp.z * ne0zx.y);
+    let de1zx = -ne1zx.dot(v1zx) + 0_f32.max(dp.y*ne1zx.x) + 0_f32.max(dp.z * ne1zx.y);
+    let de2zx = -ne2zx.dot(v2zx) + 0_f32.max(dp.y*ne2zx.x) + 0_f32.max(dp.z * ne2zx.y);
+
+    let pzx = vec4(p.z, p.x ,0.,0.);
+
+    if ne0zx.dot(pzx) + de0zx < -EPSILON || ne1zx.dot(pzx) + de1zx < -EPSILON || ne2zx.dot(pzx) + de2zx < -EPSILON {
+        return false
+    }
+
+    return true;
+
 }
