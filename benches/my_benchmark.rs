@@ -57,5 +57,3 @@ fn octre_insert_tris(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, octre_insert_tris);
-criterion_main!(benches);
