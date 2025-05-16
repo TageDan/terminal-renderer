@@ -166,11 +166,11 @@ impl Screen {
             b = last_foreground.z as u8
         ));
         
-        for row in 0..=self.h/2 {
+        for row in 0..self.h/2-1 {
             for col in 0..self.w {
                 let background = 
                 if row*2*self.w+col >= buffer.len() {
-                    Vec3::new(0.,0.,0.)
+                    continue;
                 } else {
 
 
@@ -178,7 +178,7 @@ impl Screen {
                     };
                 let foreground =
                 if (row*2+1)*self.w+col >= buffer.len() {
-                    Vec3::new(0.,0.,0.)
+                    continue;
                 } else {
 
 
@@ -205,7 +205,7 @@ impl Screen {
                 }
                     fbuf.push_str(&format!("\u{2584}"));
             }
-        if row*2 < self.h - 1 {
+        if row*2 < self.h -1 {
                 fbuf.push_str(&format!("\r\n"));
             }
         }
@@ -213,7 +213,7 @@ impl Screen {
         print!("{}",fbuf);
     }
 
-    pub fn render_octree(&self, camera: &Camera, mesh: &math::Mesh, char_buffer: &[char]) {
+    pub fn render_octree(&self, camera: &Camera, mesh: &math::Mesh, char_buffer: &[char], render_dist: f32) {
         let buffer = vec![Vec3::new(0., 0., 0.); self.w * self.h + 10];
         let forward = Vec3::new(0., 0., 1.).rotate(camera.rotation);
         let tris = mesh
@@ -291,8 +291,7 @@ impl Screen {
                     let a = normal.dot(ray.dir).max(normal.dot(inv_dir));
                     let f = a / (normal.length() * inv_dir.length());
                     // let f = f.sqrt();
-                    const RENDER_DIST: f32 = 100_000.;
-                    let color = t.color * f * ((RENDER_DIST - d) / RENDER_DIST).max(0.);
+                    let color = t.color * f * ((render_dist - d) / render_dist).max(0.);
                     return color;
                 } else {
                     return Vec3::new(0., 0., 0.);

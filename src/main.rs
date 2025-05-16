@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         screen.update_size();
         if args.octree {
-            screen.render_octree(&camera, &mesh, &args.chars);
+            screen.render_octree(&camera, &mesh, &args.chars, 500f32);
         } else {
             screen.render(&camera, &mesh, &args.chars);
         }
