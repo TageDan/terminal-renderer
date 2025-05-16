@@ -172,7 +172,7 @@ impl Octree {
             top_left_front,
             bottom_right_back,
             middle: (top_left_front + bottom_right_back) / 2.,
-            max_nodes: 1,
+            max_nodes: 2,
             inserted: 0,
             node: OctreeNode::None,
         }
@@ -219,7 +219,7 @@ impl Octree {
                     // bottom_right back
                     Box::new(
                         Octree::new(self.middle, self.bottom_right_back)
-                            .with_max_nodes(self.max_nodes * 3),
+                            .with_max_nodes((self.max_nodes as f32 * 1.5) as usize),
                     ),
                     // bottom_right_front
                     Box::new(
