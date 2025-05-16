@@ -6,7 +6,7 @@ use math::Rotation;
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator};
 
-use glam::Vec3;
+use crate::glam::Vec3;
 
 #[derive(Clone)]
 pub struct Camera {
@@ -166,7 +166,7 @@ impl Screen {
             b = last_foreground.z as u8
         ));
         
-        for row in 0..self.h/2 {
+        for row in 0..=self.h/2 {
             for col in 0..self.w {
                 let background = 
                 if row*2*self.w+col >= buffer.len() {
@@ -205,7 +205,7 @@ impl Screen {
                 }
                     fbuf.push_str(&format!("\u{2584}"));
             }
-        if row*2 != self.h - 1 {
+        if row*2 < self.h - 1 {
                 fbuf.push_str(&format!("\r\n"));
             }
         }
