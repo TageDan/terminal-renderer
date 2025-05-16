@@ -209,7 +209,7 @@ impl Screen {
                 fbuf.push_str(&format!("\r\n"));
             }
         }
-        fbuf.push_str(&format!("\x1b[48;2;0;0;0m\r"));
+        fbuf.push_str(&format!("\x1b[48;2;0;0;0m\x1b[38;2;255;255;255m\r"));
         print!("{}",fbuf);
     }
 
