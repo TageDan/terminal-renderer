@@ -55,7 +55,7 @@ impl Screen {
     pub fn update_size(&mut self) {
         if let Ok(s) = crossterm::terminal::size() {
             self.w = s.0 as usize;
-            self.h = s.1 as usize;
+            self.h = s.1 as usize * 2;
         }
     }
 
@@ -72,7 +72,7 @@ impl Screen {
                 forward.dot(v0) > 0. || forward.dot(v1) > 0. || forward.dot(v2) > 0.
             })
             .collect::<Vec<_>>();
-        let scale = self.w.min(self.h * 2);
+        let scale = self.w.min(self.h);
         let buffer: Vec<_> = buffer
             .into_par_iter()
             .enumerate()
@@ -80,7 +80,7 @@ impl Screen {
                 let row = (idx as usize) / self.w;
                 let col = (idx as usize) % self.w;
                 let ray_o = camera.pos; // Ray Origin
-                let row = (row as f32 * 2. / scale as f32) * 2. - row as f32 * 2. / scale as f32; // Scale from -1 to +1
+                let row = (row as f32 / scale as f32) * 2. - row as f32 / scale as f32; // Scale from -1 to +1
                 let col = (col as f32 / scale as f32) * 2. - col as f32 / scale as f32; // --||--
                 let ray_dir = Vec3::new(col, row, self.focus_dist);
                 let ray_dir = ray_dir.rotate(camera.rotation);
@@ -147,44 +147,70 @@ impl Screen {
     }
 
     pub fn flush(&self, buffer: &[Vec3], char_buffer: &[char]) {
-        print!("\x1b[H"); // Move curor Home
-        let mut last_color = Vec3::new(0., 0., 0.);
-        print!(
+        let mut fbuf = String::new();
+        fbuf.push_str("\x1b[H"); // Move curor Home
+        let mut last_background = Vec3::new(0., 0., 0.);
+        let mut last_foreground = Vec3::new(0., 0., 0.);
+
+        fbuf.push_str(&format!(
             "\x1b[48;2;{r};{g};{b}m",
-            r = last_color.x as u8,
-            g = last_color.y as u8,
-            b = last_color.z as u8
-        );
-        for row in 0..self.h {
+            r = last_background.x as u8,
+            g = last_background.y as u8,
+            b = last_background.z as u8
+        ));
+
+        fbuf.push_str(&format!(
+            "\x1b[38;2;{r};{g};{b}m",
+            r = last_foreground.x as u8,
+            g = last_foreground.y as u8,
+            b = last_foreground.z as u8
+        ));
+        
+        for row in 0..self.h/2 {
             for col in 0..self.w {
-                let color = buffer[row * self.w + col];
-                if color != last_color {
-                    print!(
-                        "\x1b[{t};2;{r};{g};{b}m",
-                        r = color.x as u8,
-                        g = color.y as u8,
-                        b = color.z as u8,
-                        t = match char_buffer.len() {
-                            0 => "48",
-                            _ => "38",
-                        },
-                    );
-                    last_color = color;
-                }
-                if char_buffer.len() != 0 {
-                    let light = color.element_sum() / (255. * 3.);
-                    let light = ((light * char_buffer.len() as f32) as usize)
-                        .clamp(0, char_buffer.len() - 1);
-                    print!("{}", char_buffer[light]);
+                let background = 
+                if row*2*self.w+col >= buffer.len() {
+                    Vec3::new(0.,0.,0.)
                 } else {
-                    print!(" ");
+
+
+                    buffer[(row*2)*self.w+col]
+                    };
+                let foreground =
+                if (row*2+1)*self.w+col >= buffer.len() {
+                    Vec3::new(0.,0.,0.)
+                } else {
+
+
+                    buffer[(row*2+1)*self.w+col]
+                    };
+                if background != last_background {
+                    fbuf.push_str(&format!(
+                        "\x1b[48;2;{r};{g};{b}m",
+                        r = background.x as u8,
+                        g = background.y as u8,
+                        b = background.z as u8,
+                    ));
+                    last_background = background;
                 }
+                if foreground != last_foreground {
+                    last_foreground = foreground;
+        fbuf.push_str(&format!(
+            "\x1b[38;2;{r};{g};{b}m",
+            r = last_foreground.x as u8,
+            g = last_foreground.y as u8,
+            b = last_foreground.z as u8
+        ));
+                    
+                }
+                    fbuf.push_str(&format!("\u{2584}"));
             }
-            if row != self.h - 1 {
-                println!("\r");
+        if row*2 != self.h - 1 {
+                fbuf.push_str(&format!("\r\n"));
             }
         }
-        print!("\x1b[48;2;0;0;0m\r");
+        fbuf.push_str(&format!("\x1b[48;2;0;0;0m\r"));
+        print!("{}",fbuf);
     }
 
     pub fn render_octree(&self, camera: &Camera, mesh: &math::Mesh, char_buffer: &[char]) {
@@ -226,7 +252,7 @@ impl Screen {
                 let row = (idx as usize) / self.w;
                 let col = (idx as usize) % self.w;
                 let ray_o = camera.pos; // Ray Origin
-                let row = (row as f32 * 2. / scale as f32) * 2. - self.h as f32 * 2. / scale as f32; // Scale from -1 to +1
+                let row = (row as f32 / scale as f32) * 2. - self.h as f32 / scale as f32; // Scale from -1 to +1
                 let col = (col as f32 / scale as f32) * 2. - self.w as f32 / scale as f32; // --||--
                 let ray_dir = Vec3::new(col, row, self.focus_dist);
                 let ray_dir = ray_dir.rotate(camera.rotation);

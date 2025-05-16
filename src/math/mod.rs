@@ -340,104 +340,111 @@ impl Octree {
     fn should_insert_tri(&self, tri: Arc<Tri>) -> u8 {
         let mut should_insert = 0u8;
         // for v in [tri.v0, tri.v1, tri.v2] {
-        if collides((self.middle, self.bottom_right_back), tri.clone()) {
+        if triangle_aabb_intersects(self.middle, self.bottom_right_back, tri.clone()) {
             should_insert |= 0b00000001;
         }
-        if collides((vec3(self.middle.x, self.middle.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.bottom_right_back.y, self.middle.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.middle.x, self.middle.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.bottom_right_back.y, self.middle.z), tri.clone()) {
             should_insert |= 0b00000010;
         }
-        if collides((vec3(self.middle.x, self.top_left_front.y, self.middle.z), vec3(self.bottom_right_back.x, self.middle.y, self.bottom_right_back.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.middle.x, self.top_left_front.y, self.middle.z), vec3(self.bottom_right_back.x, self.middle.y, self.bottom_right_back.z), tri.clone()) {
             should_insert |= 0b00000100;
         }
-        if collides((vec3(self.middle.x, self.top_left_front.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.middle.y, self.middle.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.middle.x, self.top_left_front.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.middle.y, self.middle.z), tri.clone()) {
             should_insert |= 0b00001000;
         }
-        if collides((vec3(self.top_left_front.x, self.middle.y, self.middle.z), vec3(self.middle.x, self.bottom_right_back.y, self.bottom_right_back.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.middle.y, self.middle.z), vec3(self.middle.x, self.bottom_right_back.y, self.bottom_right_back.z), tri.clone()) {
             should_insert |= 0b00010000;
         }
-        if collides((vec3(self.top_left_front.x, self.middle.y, self.top_left_front.z), vec3(self.middle.x, self.bottom_right_back.y, self.middle.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.middle.y, self.top_left_front.z), vec3(self.middle.x, self.bottom_right_back.y, self.middle.z), tri.clone()) {
             should_insert |= 0b00100000;
         }
-        if collides((vec3(self.top_left_front.x, self.top_left_front.y, self.middle.z), vec3(self.middle.x, self.middle.y, self.bottom_right_back.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.top_left_front.y, self.middle.z), vec3(self.middle.x, self.middle.y, self.bottom_right_back.z), tri.clone()) {
             should_insert |= 0b01000000;
         }
-        if collides((vec3(self.top_left_front.x, self.top_left_front.y, self.top_left_front.z), vec3(self.middle.x, self.middle.y, self.middle.z)), tri.clone()) {
+        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.top_left_front.y, self.top_left_front.z), vec3(self.middle.x, self.middle.y, self.middle.z), tri.clone()) {
             should_insert |= 0b10000000;
         }        
         should_insert
     }
 }
 
-fn collides((min_p, max_p): (Vec3, Vec3), tri: Arc<Tri>) -> bool {
-    let p = min_p;
-    let dp = max_p - min_p;
-    let n = tri.normal();
-    let c = vec3(if n.x > 0. {dp.x} else {0.}, if n.y > 0. {dp.y} else {0.}, if n.z > 0. {dp.z} else {0.});
-    let d1 = n.dot(c-tri.v0);
-    let d2 = n.dot(dp-c-tri.v0);
-    if (n.dot(p) + d1)*(n.dot(p) +d2) > 0. {
+/// Tests whether a triangle intersects an axis-aligned bounding box (AABB).
+///
+/// `aabb_min` and `aabb_max` define the AABB.
+/// `tri` is the triangle to test.
+pub fn triangle_aabb_intersects(aabb_min: Vec3, aabb_max: Vec3, tri: Arc<Tri>) -> bool {
+    let center = (aabb_min + aabb_max) * 0.5;
+    let extents = (aabb_max - aabb_min) * 0.5;
+
+    // Move triangle into AABB's local space
+    let v0 = tri.v0 - center;
+    let v1 = tri.v1 - center;
+    let v2 = tri.v2 - center;
+
+    let f0 = v1 - v0;
+    let f1 = v2 - v1;
+    let f2 = v0 - v2;
+
+    let axes = [
+        // 9 edge cross-products (tri edge x AABB axis)
+        Vec3::new(0.0, -f0.z, f0.y),
+        Vec3::new(0.0, -f1.z, f1.y),
+        Vec3::new(0.0, -f2.z, f2.y),
+
+        Vec3::new(f0.z, 0.0, -f0.x),
+        Vec3::new(f1.z, 0.0, -f1.x),
+        Vec3::new(f2.z, 0.0, -f2.x),
+
+        Vec3::new(-f0.y, f0.x, 0.0),
+        Vec3::new(-f1.y, f1.x, 0.0),
+        Vec3::new(-f2.y, f2.x, 0.0),
+    ];
+
+    // SAT test 1: Test the AABB's axes (x, y, z)
+    for i in 0..3 {
+        let r = extents[i];
+        let p0 = v0[i];
+        let p1 = v1[i];
+        let p2 = v2[i];
+        let min = p0.min(p1.min(p2));
+        let max = p0.max(p1.max(p2));
+        if min > r || max < -r {
+            return false;
+        }
+    }
+
+    // SAT test 2: Triangle normal
+    let normal = (v1 - v0).cross(v2 - v0);
+    let d = normal.dot(v0);
+    let r = extents.x * normal.x.abs() + extents.y * normal.y.abs() + extents.z * normal.z.abs();
+    if d.abs() > r {
         return false;
     }
 
-    let xym = if n.z < 0. { -1. } else {1.};
-    let ne0xy = vec4(-(tri.v1-tri.v0).y, (tri.v1-tri.v0).x, 0., 0.) * xym;
-    let ne1xy = vec4(-(tri.v2-tri.v1).y, (tri.v2-tri.v1).x, 0., 0.) * xym;
-    let ne2xy = vec4(-(tri.v0-tri.v2).y, (tri.v0-tri.v2).x, 0., 0.) * xym;
+    // SAT test 3: Cross-products of triangle edges and AABB axes
+    for axis in axes.iter() {
+        if axis.length_squared() < 1e-6 {
+            continue; // skip near-zero axes
+        }
 
-    let v0xy = vec4(tri.v0.x,tri.v0.y,0.,0.);
-    let v1xy = vec4(tri.v1.x,tri.v1.y,0.,0.);
-    let v2xy = vec4(tri.v2.x,tri.v2.y,0.,0.);
+        let (min_t, max_t) = project_triangle(axis, &[v0, v1, v2]);
+        let r = extents.x * axis.x.abs() + extents.y * axis.y.abs() + extents.z * axis.z.abs();
 
-    let de0xy = -ne0xy.dot(v0xy) + 0_f32.max(dp.x*ne0xy.x) + 0_f32.max(dp.y * ne0xy.y);
-    let de1xy = -ne1xy.dot(v1xy) + 0_f32.max(dp.x*ne1xy.x) + 0_f32.max(dp.y * ne1xy.y);
-    let de2xy = -ne2xy.dot(v2xy) + 0_f32.max(dp.x*ne2xy.x) + 0_f32.max(dp.y * ne2xy.y);
-
-    let pxy = vec4(p.x, p.y, 0., 0.);
-
-    if ne0xy.dot(pxy) + de0xy < - EPSILON || ne1xy.dot(pxy) + de1xy < - EPSILON || ne2xy.dot(pxy) + de2xy < - EPSILON {
-        return false
+        if min_t > r || max_t < -r {
+            return false;
+        }
     }
 
-    
-    let yzm = if n.x < 0. { -1. } else {1.};
-    let ne0yz = vec4(-(tri.v1-tri.v0).z, (tri.v1-tri.v0).y, 0., 0.) * yzm;
-    let ne1yz = vec4(-(tri.v2-tri.v1).z, (tri.v2-tri.v1).y, 0., 0.) * yzm;
-    let ne2yz = vec4(-(tri.v0-tri.v2).z, (tri.v0-tri.v2).y, 0., 0.) * yzm;
+    true
+}
 
-    let v0yz = vec4(tri.v0.y,tri.v0.z,0.,0.);
-    let v1yz = vec4(tri.v1.y,tri.v1.z,0.,0.);
-    let v2yz = vec4(tri.v2.y,tri.v2.z,0.,0.);
+/// Projects a triangle onto an axis and returns the min and max projection values.
+fn project_triangle(axis: &Vec3, verts: &[Vec3; 3]) -> (f32, f32) {
+    let p0 = verts[0].dot(*axis);
+    let p1 = verts[1].dot(*axis);
+    let p2 = verts[2].dot(*axis);
 
-    let de0yz = -ne0yz.dot(v0yz) + 0_f32.max(dp.y*ne0yz.x) + 0_f32.max(dp.z * ne0yz.y);
-    let de1yz = -ne1yz.dot(v1yz) + 0_f32.max(dp.y*ne1yz.x) + 0_f32.max(dp.z * ne1yz.y);
-    let de2yz = -ne2yz.dot(v2yz) + 0_f32.max(dp.y*ne2yz.x) + 0_f32.max(dp.z * ne2yz.y);
-
-    let pyz = vec4(p.y, p.z ,0.,0.);
-
-    if ne0yz.dot(pyz) + de0yz < -EPSILON || ne1yz.dot(pyz) + de1yz < -EPSILON || ne2yz.dot(pyz) + de2yz < -EPSILON {
-        return false
-    }
-    
-    let zxm = if n.y < 0. { -1. } else {1.};
-    let ne0zx = vec4(-(tri.v1-tri.v0).x, (tri.v1-tri.v0).z, 0., 0.) * zxm;
-    let ne1zx = vec4(-(tri.v2-tri.v1).x, (tri.v2-tri.v1).z, 0., 0.) * zxm;
-    let ne2zx = vec4(-(tri.v0-tri.v2).x, (tri.v0-tri.v2).z, 0., 0.) * zxm;
-
-    let v0zx = vec4(tri.v0.z,tri.v0.x,0.,0.);
-    let v1zx = vec4(tri.v1.z,tri.v1.x,0.,0.);
-    let v2zx = vec4(tri.v2.z,tri.v2.x,0.,0.);
-
-    //                                          z                         x
-    let de0zx = -ne0zx.dot(v0zx) + 0_f32.max(dp.y*ne0zx.x) + 0_f32.max(dp.z * ne0zx.y);
-    let de1zx = -ne1zx.dot(v1zx) + 0_f32.max(dp.y*ne1zx.x) + 0_f32.max(dp.z * ne1zx.y);
-    let de2zx = -ne2zx.dot(v2zx) + 0_f32.max(dp.y*ne2zx.x) + 0_f32.max(dp.z * ne2zx.y);
-
-    let pzx = vec4(p.z, p.x ,0.,0.);
-
-    if ne0zx.dot(pzx) + de0zx < -EPSILON || ne1zx.dot(pzx) + de1zx < -EPSILON || ne2zx.dot(pzx) + de2zx < -EPSILON {
-        return false
-    }
-
-    return true;
-
+    let min = p0.min(p1.min(p2));
+    let max = p0.max(p1.max(p2));
+    (min, max)
 }
