@@ -172,7 +172,7 @@ impl Octree {
             top_left_front,
             bottom_right_back,
             middle: (top_left_front + bottom_right_back) / 2.,
-            max_nodes: 2,
+            max_nodes: 3,
             inserted: 0,
             node: OctreeNode::None,
         }
@@ -219,7 +219,7 @@ impl Octree {
                     // bottom_right back
                     Box::new(
                         Octree::new(self.middle, self.bottom_right_back)
-                            .with_max_nodes((self.max_nodes as f32 * 1.5) as usize),
+                            .with_max_nodes(self.max_nodes),
                     ),
                     // bottom_right_front
                     Box::new(
@@ -231,7 +231,7 @@ impl Octree {
                                 self.middle.z,
                             ),
                         )
-                        .with_max_nodes(self.max_nodes * 3),
+                        .with_max_nodes(self.max_nodes),
                     ),
                     // top_right_back
                     Box::new(
@@ -243,7 +243,7 @@ impl Octree {
                                 self.bottom_right_back.z,
                             ),
                         )
-                        .with_max_nodes(self.max_nodes * 3),
+                        .with_max_nodes(self.max_nodes),
                     ),
                     // top_right_front
                     Box::new(
@@ -251,7 +251,7 @@ impl Octree {
                             Vec3::new(self.middle.x, self.top_left_front.y, self.top_left_front.z),
                             Vec3::new(self.bottom_right_back.x, self.middle.y, self.middle.z),
                         )
-                        .with_max_nodes(self.max_nodes * 3),
+                        .with_max_nodes(self.max_nodes),
                     ),
                     // bottom_left back
                     Box::new(
@@ -263,7 +263,7 @@ impl Octree {
                                 self.bottom_right_back.z,
                             ),
                         )
-                        .with_max_nodes(self.max_nodes * 3),
+                        .with_max_nodes(self.max_nodes),
                     ),
                     // bottom_left_front
                     Box::new(
@@ -271,7 +271,7 @@ impl Octree {
                             Vec3::new(self.top_left_front.x, self.middle.y, self.top_left_front.z),
                             Vec3::new(self.middle.x, self.bottom_right_back.y, self.middle.z),
                         )
-                        .with_max_nodes(self.max_nodes * 3),
+                        .with_max_nodes(self.max_nodes),
                     ),
                     // top_left_back
                     Box::new(
@@ -279,12 +279,12 @@ impl Octree {
                             Vec3::new(self.top_left_front.x, self.top_left_front.y, self.middle.z),
                             Vec3::new(self.middle.x, self.middle.y, self.bottom_right_back.z),
                         )
-                        .with_max_nodes(self.max_nodes * 3),
+                        .with_max_nodes(self.max_nodes),
                     ),
                     // top_left_front
                     Box::new(
                         Octree::new(self.top_left_front, self.middle)
-                            .with_max_nodes(self.max_nodes * 3),
+                            .with_max_nodes(self.max_nodes),
                     ),
                 ];
 

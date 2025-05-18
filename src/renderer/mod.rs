@@ -290,8 +290,8 @@ impl Screen {
                     let inv_dir = ray.dir * -1.;
                     let a = normal.dot(ray.dir).max(normal.dot(inv_dir));
                     // let f = a / (normal.length() * inv_dir.length());
-                    let f = 0.2_f32.max(a / (normal.length() * inv_dir.length())).min(0.8);
-                    // let f = f.sqrt();
+                    let f = a / (normal.length() * inv_dir.length());
+                    let f = 0.2_f32.max(f.sqrt()).min(0.8);
                     let color = t.color * f * ((render_dist - d) / render_dist).max(0.);
                     return color;
                 } else {
