@@ -146,8 +146,8 @@ impl Mesh {
 
 #[derive(Debug)]
 pub struct Octree {
-    top_left_front: Vec3,
-    bottom_right_back: Vec3,
+    pub top_left_front: Vec3,
+    pub bottom_right_back: Vec3,
     middle: Vec3,
     max_nodes: usize,
     inserted: usize,
@@ -190,8 +190,17 @@ impl Octree {
     }
 
     pub fn insert(&mut self, tri: Arc<Tri>) {
-        let insert = self.should_insert_tri(tri.clone());
         self.inserted += 1;
+
+        let insert = match self.node {
+            OctreeNode::None => 0,
+            OctreeNode::Leaf { tri: _ } => 0,
+            OctreeNode::Node {
+                tri: _,
+                children: _,
+            } => self.should_insert_tri(tri.clone()),
+        };
+
         match self.node {
             OctreeNode::None => {
                 let mut tris = Vec::with_capacity(5);
@@ -219,7 +228,7 @@ impl Octree {
                     // bottom_right back
                     Box::new(
                         Octree::new(self.middle, self.bottom_right_back)
-                            .with_max_nodes(self.max_nodes),
+                            .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // bottom_right_front
                     Box::new(
@@ -231,7 +240,7 @@ impl Octree {
                                 self.middle.z,
                             ),
                         )
-                        .with_max_nodes(self.max_nodes),
+                        .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // top_right_back
                     Box::new(
@@ -243,7 +252,7 @@ impl Octree {
                                 self.bottom_right_back.z,
                             ),
                         )
-                        .with_max_nodes(self.max_nodes),
+                        .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // top_right_front
                     Box::new(
@@ -251,7 +260,7 @@ impl Octree {
                             Vec3::new(self.middle.x, self.top_left_front.y, self.top_left_front.z),
                             Vec3::new(self.bottom_right_back.x, self.middle.y, self.middle.z),
                         )
-                        .with_max_nodes(self.max_nodes),
+                        .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // bottom_left back
                     Box::new(
@@ -263,7 +272,7 @@ impl Octree {
                                 self.bottom_right_back.z,
                             ),
                         )
-                        .with_max_nodes(self.max_nodes),
+                        .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // bottom_left_front
                     Box::new(
@@ -271,7 +280,7 @@ impl Octree {
                             Vec3::new(self.top_left_front.x, self.middle.y, self.top_left_front.z),
                             Vec3::new(self.middle.x, self.bottom_right_back.y, self.middle.z),
                         )
-                        .with_max_nodes(self.max_nodes),
+                        .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // top_left_back
                     Box::new(
@@ -279,12 +288,12 @@ impl Octree {
                             Vec3::new(self.top_left_front.x, self.top_left_front.y, self.middle.z),
                             Vec3::new(self.middle.x, self.middle.y, self.bottom_right_back.z),
                         )
-                        .with_max_nodes(self.max_nodes),
+                        .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                     // top_left_front
                     Box::new(
                         Octree::new(self.top_left_front, self.middle)
-                            .with_max_nodes(self.max_nodes),
+                            .with_max_nodes((self.max_nodes as f32 * 1.4).ceil() as usize),
                     ),
                 ];
 
@@ -343,27 +352,71 @@ impl Octree {
         if triangle_aabb_intersects(self.middle, self.bottom_right_back, tri.clone()) {
             should_insert |= 0b00000001;
         }
-        if triangle_aabb_intersects(vec3(self.middle.x, self.middle.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.bottom_right_back.y, self.middle.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(self.middle.x, self.middle.y, self.top_left_front.z),
+            vec3(
+                self.bottom_right_back.x,
+                self.bottom_right_back.y,
+                self.middle.z,
+            ),
+            tri.clone(),
+        ) {
             should_insert |= 0b00000010;
         }
-        if triangle_aabb_intersects(vec3(self.middle.x, self.top_left_front.y, self.middle.z), vec3(self.bottom_right_back.x, self.middle.y, self.bottom_right_back.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(self.middle.x, self.top_left_front.y, self.middle.z),
+            vec3(
+                self.bottom_right_back.x,
+                self.middle.y,
+                self.bottom_right_back.z,
+            ),
+            tri.clone(),
+        ) {
             should_insert |= 0b00000100;
         }
-        if triangle_aabb_intersects(vec3(self.middle.x, self.top_left_front.y, self.top_left_front.z), vec3(self.bottom_right_back.x, self.middle.y, self.middle.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(self.middle.x, self.top_left_front.y, self.top_left_front.z),
+            vec3(self.bottom_right_back.x, self.middle.y, self.middle.z),
+            tri.clone(),
+        ) {
             should_insert |= 0b00001000;
         }
-        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.middle.y, self.middle.z), vec3(self.middle.x, self.bottom_right_back.y, self.bottom_right_back.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(self.top_left_front.x, self.middle.y, self.middle.z),
+            vec3(
+                self.middle.x,
+                self.bottom_right_back.y,
+                self.bottom_right_back.z,
+            ),
+            tri.clone(),
+        ) {
             should_insert |= 0b00010000;
         }
-        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.middle.y, self.top_left_front.z), vec3(self.middle.x, self.bottom_right_back.y, self.middle.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(self.top_left_front.x, self.middle.y, self.top_left_front.z),
+            vec3(self.middle.x, self.bottom_right_back.y, self.middle.z),
+            tri.clone(),
+        ) {
             should_insert |= 0b00100000;
         }
-        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.top_left_front.y, self.middle.z), vec3(self.middle.x, self.middle.y, self.bottom_right_back.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(self.top_left_front.x, self.top_left_front.y, self.middle.z),
+            vec3(self.middle.x, self.middle.y, self.bottom_right_back.z),
+            tri.clone(),
+        ) {
             should_insert |= 0b01000000;
         }
-        if triangle_aabb_intersects(vec3(self.top_left_front.x, self.top_left_front.y, self.top_left_front.z), vec3(self.middle.x, self.middle.y, self.middle.z), tri.clone()) {
+        if triangle_aabb_intersects(
+            vec3(
+                self.top_left_front.x,
+                self.top_left_front.y,
+                self.top_left_front.z,
+            ),
+            vec3(self.middle.x, self.middle.y, self.middle.z),
+            tri.clone(),
+        ) {
             should_insert |= 0b10000000;
-        }        
+        }
         should_insert
     }
 }
@@ -390,11 +443,9 @@ pub fn triangle_aabb_intersects(aabb_min: Vec3, aabb_max: Vec3, tri: Arc<Tri>) -
         Vec3::new(0.0, -f0.z, f0.y),
         Vec3::new(0.0, -f1.z, f1.y),
         Vec3::new(0.0, -f2.z, f2.y),
-
         Vec3::new(f0.z, 0.0, -f0.x),
         Vec3::new(f1.z, 0.0, -f1.x),
         Vec3::new(f2.z, 0.0, -f2.x),
-
         Vec3::new(-f0.y, f0.x, 0.0),
         Vec3::new(-f1.y, f1.x, 0.0),
         Vec3::new(-f2.y, f2.x, 0.0),

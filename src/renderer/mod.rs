@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::math::{self, Octree};
 use crossterm;
+use glam::vec3;
 use math::Rotation;
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator};
@@ -20,11 +21,12 @@ impl Camera {
     }
 }
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Screen {
     pub w: usize,
     pub h: usize,
     pub focus_dist: f32,
+    octree: Octree,
 }
 
 impl Drop for Screen {
@@ -40,6 +42,7 @@ impl Screen {
             w: 0,
             h: 0,
             focus_dist,
+            octree: Octree::new(vec3(0., 0., 0.), vec3(0., 0., 0.)),
         };
 
         crossterm::terminal::enable_raw_mode();
@@ -133,7 +136,9 @@ impl Screen {
                     let normal = t.normal();
                     let inv_dir = ray.dir * -1.;
                     let a = normal.dot(ray.dir).max(normal.dot(inv_dir));
-                    let f = 0.2_f32.max(a / (normal.length() * inv_dir.length())).min(0.8);
+                    let f = 0.2_f32
+                        .max(a / (normal.length() * inv_dir.length()))
+                        .min(0.8);
                     // let f = f.sqrt();
                     const RENDER_DIST: f32 = 100_000.;
                     let color = t.color * f * ((RENDER_DIST - d) / RENDER_DIST).max(0.);
@@ -165,25 +170,19 @@ impl Screen {
             g = last_foreground.y as u8,
             b = last_foreground.z as u8
         ));
-        
-        for row in 0..self.h/2-1 {
+
+        for row in 0..self.h / 2 - 1 {
             for col in 0..self.w {
-                let background = 
-                if row*2*self.w+col >= buffer.len() {
+                let background = if row * 2 * self.w + col >= buffer.len() {
                     continue;
                 } else {
-
-
-                    buffer[(row*2)*self.w+col]
-                    };
-                let foreground =
-                if (row*2+1)*self.w+col >= buffer.len() {
+                    buffer[(row * 2) * self.w + col]
+                };
+                let foreground = if (row * 2 + 1) * self.w + col >= buffer.len() {
                     continue;
                 } else {
-
-
-                    buffer[(row*2+1)*self.w+col]
-                    };
+                    buffer[(row * 2 + 1) * self.w + col]
+                };
                 if background != last_background {
                     fbuf.push_str(&format!(
                         "\x1b[48;2;{r};{g};{b}m",
@@ -195,25 +194,30 @@ impl Screen {
                 }
                 if foreground != last_foreground {
                     last_foreground = foreground;
-        fbuf.push_str(&format!(
-            "\x1b[38;2;{r};{g};{b}m",
-            r = last_foreground.x as u8,
-            g = last_foreground.y as u8,
-            b = last_foreground.z as u8
-        ));
-                    
+                    fbuf.push_str(&format!(
+                        "\x1b[38;2;{r};{g};{b}m",
+                        r = last_foreground.x as u8,
+                        g = last_foreground.y as u8,
+                        b = last_foreground.z as u8
+                    ));
                 }
-                    fbuf.push_str(&format!("\u{2584}"));
+                fbuf.push_str(&format!("\u{2584}"));
             }
-        if row*2 < self.h -1 {
+            if row * 2 < self.h - 1 {
                 fbuf.push_str(&format!("\r\n"));
             }
         }
         fbuf.push_str(&format!("\x1b[48;2;0;0;0m\x1b[38;2;255;255;255m\r"));
-        print!("{}",fbuf);
+        print!("{}", fbuf);
     }
 
-    pub fn render_octree(&self, camera: &Camera, mesh: &math::Mesh, char_buffer: &[char], render_dist: f32) {
+    pub fn render_octree(
+        &mut self,
+        camera: &Camera,
+        mesh: &math::Mesh,
+        char_buffer: &[char],
+        render_dist: f32,
+    ) {
         let buffer = vec![Vec3::new(0., 0., 0.); self.w * self.h + 10];
         let forward = Vec3::new(0., 0., 1.).rotate(camera.rotation);
         let tris = mesh
@@ -238,10 +242,18 @@ impl Screen {
             }
         }
 
-        let mut octree = math::Octree::new(min_v, max_v);
+        if min_v.x < self.octree.top_left_front.x
+            || min_v.y < self.octree.top_left_front.y
+            || min_v.z < self.octree.top_left_front.z
+            || max_v.x > self.octree.bottom_right_back.x
+            || max_v.y > self.octree.bottom_right_back.y
+            || max_v.z > self.octree.bottom_right_back.z
+        {
+            self.octree = math::Octree::new(min_v, max_v);
+        }
 
         for tri in &tris {
-            octree.insert(Arc::new((*tri).clone()));
+            self.octree.insert(Arc::new((*tri).clone()));
         }
 
         let scale = self.w.min(self.h * 2);
@@ -263,27 +275,28 @@ impl Screen {
                 let mut aabb_check_list = [0f32; 9];
 
                 // Get hit triangle and distance to hit
-                let hit = octree
-                    .ray_search_tree(ray_o, ray_dir)
-                    .iter()
-                    .fold(None, |acc, tri| {
-                        if let Some(d) = tri.hit(&ray) {
-                            if d < 0. {
-                                return acc;
-                            };
-                            if let Some((d2, _)) = acc {
-                                if d < d2 {
-                                    return Some((d, tri.clone()));
-                                } else {
+                let hit =
+                    self.octree
+                        .ray_search_tree(ray_o, ray_dir)
+                        .iter()
+                        .fold(None, |acc, tri| {
+                            if let Some(d) = tri.hit(&ray) {
+                                if d < 0. {
                                     return acc;
                                 };
+                                if let Some((d2, _)) = acc {
+                                    if d < d2 {
+                                        return Some((d, tri.clone()));
+                                    } else {
+                                        return acc;
+                                    };
+                                } else {
+                                    return Some((d, tri.clone()));
+                                }
                             } else {
-                                return Some((d, tri.clone()));
-                            }
-                        } else {
-                            return acc;
-                        };
-                    });
+                                return acc;
+                            };
+                        });
 
                 if let Some((d, t)) = hit {
                     let normal = t.normal();
